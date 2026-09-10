@@ -61,7 +61,7 @@ npm run preview    # превью сборки
 npm run lint       # ESLint
 ```
 
-## Структура `src/`
+## Структура
 
 ```
 src/
