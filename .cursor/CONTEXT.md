@@ -8,7 +8,7 @@
 
 - **React 19** + **TypeScript 5** + **Vite 8**
 - **Tailwind CSS 4** (`@tailwindcss/vite`)
-- Деплой: GitHub Actions → GitHub Pages
+- Деплой: GitHub Actions → GitHub Pages (Node.js 22+)
 
 ## Ключевые решения
 
@@ -17,19 +17,44 @@
 - Короткая сторона изображения делится на `N` (5–11) квадратов: `tileSize = floor(shorter / N)`.
 - Длинная сторона: `floor(longer / tileSize)` квадратов; лишние пиксели обрезаются по центру.
 - Размер отображения: `scale = min(availableW/cropW, availableH/cropH, 1)` — не увеличивать сверх 1:1.
+- Доступная область измеряется через `useAvailableSize` (ResizeObserver).
 
 ### CSS-фрагменты
 
 - Картинка не режется на файлы. Каждый тайл — `<div>` с `background-image`.
 - `background-size`: `(fullCols × 100%) (fullRows × 100%)` по полной сетке исходника.
 - `background-position`: проценты от `(marginCol + col, marginRow + row)` в полной сетке.
-- При перемешивании меняется только порядок в массиве `order`, стили фрагмента привязаны к `col/row` тайла.
+- При перемешивании меняется только порядок в массиве `order`, стили фрагмента привязаны к `col/row` тайла (не к слоту).
 
-### Управление
+### Управление (Pointer Events, не HTML5 DnD)
 
-- **Клик-клик**: выделение рамкой, обмен двух слотов. Выделение хранится в state + ref; `pointerdown` его не сбрасывает (иначе второй клик теряет первую плитку).
-- **Pointer Events** (не HTML5 DnD): порог перетаскивания — половина размера плитки.
-- Drag: ячейка в CSS Grid остаётся в потоке как `invisible` placeholder; видимая копия рендерится отдельно (`position: absolute`, `z-50`) и следует за указателем. Так сетка не схлопывается.
+**Клик-клик:**
+- Первый клик — выделение рамкой (`selectedSlot` в state + `selectedSlotRef`).
+- Второй клик — обмен двух слотов.
+- `pointerdown` **не сбрасывает** выделение (раньше это ломало второй клик).
+- Выделение сбрасывается при успешном обмене, при начале drag или при повторном клике по той же плитке.
+- Обработчики читают `selectedSlotRef.current`, чтобы избежать stale closure в `finishDrag`.
+
+**Drag-and-drop:**
+- Порог: движение < `tileSize / 2` → клик; ≥ порога → drag.
+- Паттерн **placeholder + floating tile**:
+  - ячейка в CSS Grid остаётся в потоке с классом `invisible` (placeholder);
+  - видимая копия рендерится отдельно как `PuzzleTile variant="floating"` с `position: absolute`, `z-50`, следует за указателем.
+- Так сетка не схлопывается при перетаскивании (раньше `absolute` на grid-элементе ломал layout).
+
+### Перемешивание
+
+- `shuffleBySwaps(order)` в [`src/utils/shuffle.ts`](src/utils/shuffle.ts): для **каждой** плитки (`len` итераций) — один обмен со случайной другой (`j !== i`).
+- Повторять, пока `isSolved(result)` (макс. 20 попыток).
+- Не путать с параметром сложности `N` (5–11): он задаёт размер сетки, а не число обменов.
+
+### Победа
+
+- `isSolved(order)`: `order[i] === i` для всех слотов.
+- При победе: `flashWin=true` на 500 ms (жёлтый фон сетки + оверлей), затем `showCompletedImage=true` (только обрезанное изображение без линий сетки).
+- Сообщение «У вас получилось!» и кнопка «Начать новую игру» показываются сразу при `won` (не ждут конца flash), в блоке `shrink-0` под мозаикой.
+- `PuzzleBoard` получает `compact={won}` — снимает `flex-1`, чтобы UI победы не уходил за нижний край экрана.
+- Новая партия: `Game` перемонтируется через `key={`${image.id}-${grid.cols}x${grid.rows}`}` в `App.tsx`.
 
 ### i18n
 
@@ -40,26 +65,44 @@
 ### Игровой цикл
 
 - Экраны: `gallery` → `difficulty` → `game`.
-- Перемешивание: для каждой плитки один обмен со случайной другой (`len` обменов); повторять, пока пазл не собран случайно.
-- Победа: жёлтая вспышка 500 мс (оверлей на сетке), сообщение и кнопка сразу под мозаикой (`compact` layout, без `flex-1`). Затем сетка скрывается, остаётся обрезанное изображение.
 - Кнопка «Выход» на difficulty/game сразу в галерею.
+- «Начать новую игру» после победы — тоже в галерею.
 
 ### Деплой
 
 - `vite.config.ts`: `base: '/'` в dev, `base: '/Vibe_MosaicGame_TS-React-Vite_Cursor-Composer-2-5/'` в production.
-- Workflow `.github/workflows/deploy.yml`, Node.js 22+.
+- Workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
+- В Settings → Pages источник сборки — GitHub Actions.
 
 ## Структура `src/`
 
 ```
 src/
-  App.tsx              — маршрутизация экранов
+  App.tsx              — маршрутизация экранов, key для перемонтирования Game
   main.tsx             — точка входа
-  index.css            — Tailwind + анимации
-  data/images.ts       — массив IMAGES
-  types/               — общие типы
-  i18n/                — переводы и LanguageContext
-  utils/               — grid, shuffle, loadImage
-  hooks/               — useAvailableSize
-  components/          — Gallery, DifficultySelect, Game, PuzzleBoard, PuzzleTile, Layout, LanguageSwitcher
+  index.css            — Tailwind + анимация fadeIn
+  data/images.ts       — массив IMAGES (стабильные URL)
+  types/index.ts       — PuzzleImage, GridConfig, Locale…
+  i18n/
+    translations.ts    — строки RU/EN
+    LanguageContext.tsx
+  utils/
+    grid.ts            — computeGrid, getTileBackgroundStyle, getCroppedImageStyle
+    shuffle.ts         — shuffleBySwaps (len обменов), isSolved
+    loadImage.ts       — naturalWidth/Height
+  hooks/
+    useAvailableSize.ts — ResizeObserver для игровой области
+  components/
+    Layout.tsx
+    LanguageSwitcher.tsx
+    Gallery.tsx
+    DifficultySelect.tsx
+    Game.tsx           — order, moves, won/flashWin/showCompletedImage
+    PuzzleBoard.tsx    — grid, pointer events, placeholder+float drag, compact
+    PuzzleTile.tsx     — variant: grid | floating, placeholder, selected ring
 ```
+
+## Известные нюансы
+
+- `Game.tsx` определяет победу синхронно в render (`if (isSolved && !won) setWon(true)`) — работает, но при рефакторинге можно перенести в обработчик последнего обмена.
+- ESLint `react-hooks/set-state-in-effect` может ругаться на другие effect-паттерны; текущая победа через render + отдельный effect только для таймера flash.
