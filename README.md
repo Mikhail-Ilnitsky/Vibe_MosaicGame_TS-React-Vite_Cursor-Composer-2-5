@@ -2,9 +2,16 @@
 
 Адаптивная браузерная игра-пазл из квадратных фрагментов изображения. Чистый фронтенд (SPA), без бэкенда и базы данных.
 
-**Демо (GitHub Pages):** `https://<username>.github.io/Vibe_MosaicGame_TS-React-Vite_Cursor-Composer-2-5/`
+**Демо:** `https://mikhail-ilnitsky.github.io/Vibe_MosaicGame_TS-React-Vite_Cursor-Composer-2-5/`
 
-> После первого деплоя замените `<username>` на ваш GitHub-логин. В **Settings → Pages** источник сборки — **GitHub Actions**.
+## Особенности
+
+Собрано по подробному промпту с помощью **Composer-2.5-Fast**
+Начальный промпт: 8 запусков Composer-2.5-Fast = 889 Ktokens
+Исправление ошибок: 
+- 1 запуск Composer-2.5-Fast для планирования = 171 Ktokens
+- 1 запуск Cursor-grok-4.6-Fast для исправления (сам подставился вместо Composer) = 972 Ktokens
+Всего в сумме: 2 Mtokens
 
 ## Возможности
 
