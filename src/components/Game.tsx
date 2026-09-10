@@ -7,7 +7,6 @@ import { PuzzleBoard } from './PuzzleBoard';
 
 interface GameProps {
   image: PuzzleImage;
-  divisionN: number;
   grid: GridConfig;
   onExit: () => void;
   onNewGame: () => void;
@@ -15,7 +14,6 @@ interface GameProps {
 
 export function Game({
   image,
-  divisionN,
   grid,
   onExit,
   onNewGame,
@@ -23,25 +21,28 @@ export function Game({
   const { tr } = useLanguage();
   const tiles = useMemo(() => createTiles(grid), [grid]);
 
-  const [order, setOrder] = useState<number[]>(() => {
-    const initial = tiles.map((t) => t.id);
-    return shuffleBySwaps(initial, divisionN);
-  });
+  const [order, setOrder] = useState<number[]>(() =>
+    shuffleBySwaps(tiles.map((t) => t.id)),
+  );
   const [moves, setMoves] = useState(0);
   const [showOriginal, setShowOriginal] = useState(false);
   const [won, setWon] = useState(false);
   const [flashWin, setFlashWin] = useState(false);
   const [showCompletedImage, setShowCompletedImage] = useState(false);
 
+  if (isSolved(order) && !won) {
+    setWon(true);
+    setFlashWin(true);
+  }
+
   useEffect(() => {
-    const initial = tiles.map((t) => t.id);
-    setOrder(shuffleBySwaps(initial, divisionN));
-    setMoves(0);
-    setShowOriginal(false);
-    setWon(false);
-    setFlashWin(false);
-    setShowCompletedImage(false);
-  }, [tiles, divisionN, image.id]);
+    if (!flashWin) return;
+    const flashTimer = window.setTimeout(() => {
+      setFlashWin(false);
+      setShowCompletedImage(true);
+    }, 500);
+    return () => window.clearTimeout(flashTimer);
+  }, [flashWin]);
 
   const handleSwap = useCallback(
     (slotA: number, slotB: number) => {
@@ -56,19 +57,6 @@ export function Game({
     [won],
   );
 
-  useEffect(() => {
-    if (won) return;
-    if (isSolved(order)) {
-      setWon(true);
-      setFlashWin(true);
-      const flashTimer = window.setTimeout(() => {
-        setFlashWin(false);
-        setShowCompletedImage(true);
-      }, 500);
-      return () => window.clearTimeout(flashTimer);
-    }
-  }, [order, won]);
-
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
@@ -77,7 +65,7 @@ export function Game({
           <button
             type="button"
             onClick={() => setShowOriginal((v) => !v)}
-            disabled={won && showCompletedImage}
+            disabled={won}
             className="rounded-xl bg-neutral-900 px-5 py-3 text-base font-medium text-white transition hover:bg-neutral-800 disabled:opacity-50"
           >
             {tr(showOriginal ? 'hideOriginal' : 'showOriginal')}
@@ -97,15 +85,16 @@ export function Game({
         order={order}
         grid={grid}
         imageUrl={image.url}
-        showOriginal={showOriginal && !showCompletedImage}
+        showOriginal={showOriginal && !won}
         flashWin={flashWin}
         showCompletedImage={showCompletedImage}
         disabled={won}
+        compact={won}
         onSwap={handleSwap}
       />
 
-      {won && showCompletedImage && (
-        <div className="flex animate-[fadeIn_0.5s_ease-out] flex-col items-center gap-4 pt-2">
+      {won && (
+        <div className="flex shrink-0 animate-[fadeIn_0.5s_ease-out] flex-col items-center gap-4 pb-2 pt-2">
           <p className="text-xl font-medium text-neutral-900">{tr('winMessage')}</p>
           <p className="text-neutral-600">{tr('winMoves', { count: moves })}</p>
           <button

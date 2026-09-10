@@ -1,4 +1,4 @@
-export function shuffleBySwaps(order: number[], swapCount: number): number[] {
+export function shuffleBySwaps(order: number[]): number[] {
   const len = order.length;
   if (len < 2) return [...order];
 
@@ -7,13 +7,12 @@ export function shuffleBySwaps(order: number[], swapCount: number): number[] {
 
   do {
     result = [...order];
-    for (let i = 0; i < swapCount; i++) {
-      const a = Math.floor(Math.random() * len);
-      let b = Math.floor(Math.random() * len);
-      while (b === a) {
-        b = Math.floor(Math.random() * len);
+    for (let i = 0; i < len; i++) {
+      let j = Math.floor(Math.random() * len);
+      while (j === i) {
+        j = Math.floor(Math.random() * len);
       }
-      [result[a], result[b]] = [result[b], result[a]];
+      [result[i], result[j]] = [result[j], result[i]];
     }
     attempts++;
   } while (isSolved(result) && attempts < 20);

@@ -10,7 +10,6 @@ export default function App() {
   const { tr } = useLanguage();
   const [screen, setScreen] = useState<Screen>('gallery');
   const [selectedImage, setSelectedImage] = useState<PuzzleImage | null>(null);
-  const [divisionN, setDivisionN] = useState(5);
   const [dimensions, setDimensions] = useState<LoadedImageDimensions | null>(null);
   const [grid, setGrid] = useState<GridConfig | null>(null);
 
@@ -27,11 +26,9 @@ export default function App() {
   };
 
   const handleDifficultySelect = (
-    n: number,
     dims: LoadedImageDimensions,
     gridConfig: GridConfig,
   ) => {
-    setDivisionN(n);
     setDimensions(dims);
     setGrid(gridConfig);
     setScreen('game');
@@ -51,8 +48,8 @@ export default function App() {
 
       {screen === 'game' && selectedImage && dimensions && grid && (
         <Game
+          key={`${selectedImage.id}-${grid.cols}x${grid.rows}`}
           image={selectedImage}
-          divisionN={divisionN}
           grid={grid}
           onExit={goGallery}
           onNewGame={goGallery}

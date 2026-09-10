@@ -4,7 +4,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import type { GridConfig, PuzzleTile as PuzzleTileType } from '../types';
@@ -21,6 +20,7 @@ interface PuzzleBoardProps {
   flashWin: boolean;
   showCompletedImage: boolean;
   disabled: boolean;
+  compact?: boolean;
   onSwap: (indexA: number, indexB: number) => void;
 }
 
@@ -44,13 +44,20 @@ export function PuzzleBoard({
   flashWin,
   showCompletedImage,
   disabled,
+  compact = false,
   onSwap,
 }: PuzzleBoardProps) {
   const { ref: areaRef, width: areaWidth, height: areaHeight } = useAvailableSize<HTMLDivElement>();
   const boardRef = useRef<HTMLDivElement>(null);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
+  const selectedSlotRef = useRef<number | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const dragRef = useRef<DragState | null>(null);
+
+  const updateSelectedSlot = (slot: number | null) => {
+    selectedSlotRef.current = slot;
+    setSelectedSlot(slot);
+  };
 
   const scale = useMemo(
     () => (areaWidth && areaHeight ? computeDisplayScale(grid, areaWidth, areaHeight) : 1),
@@ -97,7 +104,7 @@ export function PuzzleBoard({
     (slotA: number, slotB: number) => {
       if (slotA === slotB || disabled) return;
       onSwap(slotA, slotB);
-      setSelectedSlot(null);
+      updateSelectedSlot(null);
     },
     [disabled, onSwap],
   );
@@ -105,13 +112,18 @@ export function PuzzleBoard({
   const handleClickSlot = useCallback(
     (slotIndex: number) => {
       if (disabled) return;
-      if (selectedSlot === null) {
-        setSelectedSlot(slotIndex);
+      const current = selectedSlotRef.current;
+      if (current === null) {
+        updateSelectedSlot(slotIndex);
         return;
       }
-      swapSlots(selectedSlot, slotIndex);
+      if (current === slotIndex) {
+        updateSelectedSlot(null);
+        return;
+      }
+      swapSlots(current, slotIndex);
     },
-    [disabled, selectedSlot, swapSlots],
+    [disabled, swapSlots],
   );
 
   const finishDrag = useCallback(
@@ -127,6 +139,8 @@ export function PuzzleBoard({
         const targetSlot = getSlotFromPoint(clientX, clientY);
         if (targetSlot !== null) {
           swapSlots(state.slotIndex, targetSlot);
+        } else {
+          updateSelectedSlot(null);
         }
       }
 
@@ -145,6 +159,9 @@ export function PuzzleBoard({
       const dx = e.clientX - state.startX;
       const dy = e.clientY - state.startY;
       const moved = state.moved || Math.hypot(dx, dy) > 4;
+      if (moved && !state.moved) {
+        updateSelectedSlot(null);
+      }
       const next = {
         ...state,
         currentX: e.clientX,
@@ -178,8 +195,6 @@ export function PuzzleBoard({
     const slotIndex = order.indexOf(tileId);
     if (slotIndex < 0) return;
 
-    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
-
     const next: DragState = {
       tileId,
       slotIndex,
@@ -192,14 +207,22 @@ export function PuzzleBoard({
     };
     dragRef.current = next;
     setDrag(next);
-    setSelectedSlot(null);
   };
 
   const croppedStyle = getCroppedImageStyle(grid, imageUrl);
+  const areaClass = `flex min-h-0 items-center justify-center ${compact ? 'shrink-0' : 'flex-1'}`;
 
-  if (showCompletedImage) {
-    return (
-      <div ref={areaRef} className="flex min-h-0 flex-1 items-center justify-center">
+  const draggingTile = drag?.moved ? tileById.get(drag.tileId) : undefined;
+  const originLeft = drag
+    ? (drag.slotIndex % grid.cols) * tileDisplaySize
+    : 0;
+  const originTop = drag
+    ? Math.floor(drag.slotIndex / grid.cols) * tileDisplaySize
+    : 0;
+
+  return (
+    <div ref={areaRef} className={areaClass}>
+      {showCompletedImage ? (
         <div
           className="shrink-0 bg-neutral-100"
           style={{
@@ -208,68 +231,75 @@ export function PuzzleBoard({
             ...croppedStyle,
           }}
         />
-      </div>
-    );
-  }
+      ) : (
+        <div
+          ref={boardRef}
+          className={`relative grid shrink-0 overflow-visible transition-colors duration-500 ${
+            flashWin ? 'bg-yellow-300' : 'bg-neutral-100'
+          }`}
+          style={{
+            width: boardWidth,
+            height: boardHeight,
+            gridTemplateColumns: `repeat(${grid.cols}, 1fr)`,
+            gridTemplateRows: `repeat(${grid.rows}, 1fr)`,
+          }}
+        >
+          {showOriginal && (
+            <div
+              className="absolute inset-0 z-10"
+              style={croppedStyle}
+              aria-hidden
+            />
+          )}
 
-  return (
-    <div ref={areaRef} className="flex min-h-0 flex-1 items-center justify-center">
-      <div
-        ref={boardRef}
-        className={`relative shrink-0 grid transition-colors duration-500 ${
-          flashWin ? 'bg-yellow-300' : 'bg-neutral-100'
-        }`}
-        style={{
-          width: boardWidth,
-          height: boardHeight,
-          gridTemplateColumns: `repeat(${grid.cols}, 1fr)`,
-          gridTemplateRows: `repeat(${grid.rows}, 1fr)`,
-        }}
-      >
-        {showOriginal && (
-          <div
-            className="absolute inset-0 z-10"
-            style={croppedStyle}
-            aria-hidden
-          />
-        )}
+          {flashWin && (
+            <div
+              className="pointer-events-none absolute inset-0 z-20 bg-yellow-300/60"
+              aria-hidden
+            />
+          )}
 
-        {!showOriginal &&
-          order.map((tileId, slotIndex) => {
-            const tile = tileById.get(tileId);
-            if (!tile) return null;
+          {!showOriginal &&
+            order.map((tileId, slotIndex) => {
+              const tile = tileById.get(tileId);
+              if (!tile) return null;
 
-            const isDragging = drag?.tileId === tileId && drag.moved;
-            let dragStyle: CSSProperties | undefined;
+              const isDragging = drag?.tileId === tileId && drag.moved;
 
-            if (isDragging && drag) {
-              dragStyle = {
+              return (
+                <PuzzleTile
+                  key={tile.id}
+                  tileId={tile.id}
+                  col={tile.col}
+                  row={tile.row}
+                  grid={grid}
+                  imageUrl={imageUrl}
+                  selected={selectedSlot === slotIndex}
+                  placeholder={isDragging}
+                  onPointerDown={handlePointerDown}
+                />
+              );
+            })}
+
+          {drag?.moved && draggingTile && (
+            <PuzzleTile
+              tileId={draggingTile.id}
+              col={draggingTile.col}
+              row={draggingTile.row}
+              grid={grid}
+              imageUrl={imageUrl}
+              variant="floating"
+              style={{
                 position: 'absolute',
                 width: tileDisplaySize,
                 height: tileDisplaySize,
-                left: slotIndex % grid.cols * tileDisplaySize + (drag.currentX - drag.startX),
-                top: Math.floor(slotIndex / grid.cols) * tileDisplaySize + (drag.currentY - drag.startY),
-                pointerEvents: 'none',
-              };
-            }
-
-            return (
-              <PuzzleTile
-                key={tile.id}
-                tileId={tile.id}
-                col={tile.col}
-                row={tile.row}
-                grid={grid}
-                imageUrl={imageUrl}
-                selected={selectedSlot === slotIndex}
-                hidden={isDragging}
-                dragging={isDragging}
-                dragStyle={dragStyle}
-                onPointerDown={handlePointerDown}
-              />
-            );
-          })}
-      </div>
+                left: originLeft + (drag.currentX - drag.startX),
+                top: originTop + (drag.currentY - drag.startY),
+              }}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

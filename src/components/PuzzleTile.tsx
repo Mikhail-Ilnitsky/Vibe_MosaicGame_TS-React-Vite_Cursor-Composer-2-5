@@ -8,11 +8,11 @@ interface PuzzleTileProps {
   row: number;
   grid: GridConfig;
   imageUrl: string;
-  selected: boolean;
-  hidden: boolean;
-  dragging: boolean;
-  dragStyle?: CSSProperties;
-  onPointerDown: (e: ReactPointerEvent<HTMLDivElement>, tileId: number) => void;
+  selected?: boolean;
+  placeholder?: boolean;
+  variant?: 'grid' | 'floating';
+  style?: CSSProperties;
+  onPointerDown?: (e: ReactPointerEvent<HTMLDivElement>, tileId: number) => void;
 }
 
 export function PuzzleTile({
@@ -21,29 +21,34 @@ export function PuzzleTile({
   row,
   grid,
   imageUrl,
-  selected,
-  hidden,
-  dragging,
-  dragStyle,
+  selected = false,
+  placeholder = false,
+  variant = 'grid',
+  style,
   onPointerDown,
 }: PuzzleTileProps) {
   const bgStyle = getTileBackgroundStyle(col, row, grid, imageUrl);
+  const floating = variant === 'floating';
 
   return (
     <div
-      role="button"
-      tabIndex={0}
+      role={floating ? undefined : 'button'}
+      tabIndex={floating ? undefined : 0}
       data-tile-id={tileId}
-      onPointerDown={(e) => onPointerDown(e, tileId)}
-      className={`relative box-border touch-none border border-white/60 ${
-        hidden ? 'invisible' : ''
-      } ${dragging ? 'z-50 opacity-90 shadow-lg' : 'z-0'} ${
-        selected && !dragging ? 'ring-2 ring-neutral-900 ring-offset-1' : ''
-      }`}
+      onPointerDown={
+        onPointerDown ? (e) => onPointerDown(e, tileId) : undefined
+      }
+      className={`box-border border border-white/60 ${
+        placeholder ? 'invisible' : ''
+      } ${
+        floating
+          ? 'pointer-events-none z-50 opacity-90 shadow-lg'
+          : 'relative z-0 touch-none'
+      } ${selected && !floating && !placeholder ? 'ring-2 ring-neutral-900 ring-offset-1' : ''}`}
       style={{
         ...bgStyle,
-        ...dragStyle,
-        cursor: dragging ? 'grabbing' : 'pointer',
+        ...style,
+        cursor: floating ? 'grabbing' : 'pointer',
       }}
     />
   );

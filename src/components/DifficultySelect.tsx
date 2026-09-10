@@ -6,7 +6,7 @@ import { loadImageDimensions } from '../utils/loadImage';
 
 interface DifficultySelectProps {
   image: PuzzleImage;
-  onSelect: (divisionN: number, dimensions: LoadedImageDimensions, grid: GridConfig) => void;
+  onSelect: (dimensions: LoadedImageDimensions, grid: GridConfig) => void;
   onExit: () => void;
 }
 
@@ -68,7 +68,7 @@ export function DifficultySelect({ image, onSelect, onExit }: DifficultySelectPr
               <button
                 key={n}
                 type="button"
-                onClick={() => onSelect(n, dimensions, grid)}
+                onClick={() => onSelect(dimensions, grid)}
                 className="rounded-xl border border-neutral-200 bg-white px-4 py-5 text-lg font-medium text-neutral-900 shadow-sm transition hover:border-neutral-400 hover:shadow-md"
               >
                 {tr('difficultyOption', { rows: grid.rows, cols: grid.cols })}
